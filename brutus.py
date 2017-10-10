@@ -1,8 +1,9 @@
 #!/bin/python
 
+import os
 import string
-import time
 import argparse
+import pickle
 from random import randint
 from nltk import ngrams
 from itertools import permutations
@@ -23,10 +24,11 @@ def populate_english_ngrams(filename):
             english_ngrams += ngramize(line, 2)
             english_ngrams += ngramize(line, 3)
     english_ngrams = set(english_ngrams)
+    pickle.dump(english_ngrams, open('ngrams.p', 'wb'))
 
 def encrypt(input):
     permutation_number = randint(0,5)
-    permutation = ''.join([p for p in permutations([string.ascii_lowercase,string.ascii_uppercase,'0123456789'])][permutation_number])
+    permutation = ''.join([p for p in permutations([string.ascii_lowercase,string.ascii_uppercase,'1234567890'])][permutation_number])
     offset = randint(1,62)
     encrypted = ''.join([permutation[(permutation.index(letter) + offset) % 62] for letter in input])
     print(encrypted)
@@ -40,23 +42,23 @@ def decrypt(input):
     largest_trigram_candidate = None
     largest_trigram_count = 0
     decryption_candidates = []
-    for domain in permutations([string.ascii_lowercase,string.ascii_uppercase,'0123456789']):
+    for domain in permutations([string.ascii_lowercase,string.ascii_uppercase,'1234567890']):
         domain = ''.join(domain)
-        for offset in range(62):
-            candidate = ''.join([domain[(domain.index(letter) + offset) % 62] for letter in input])
-            decryption_candidates.append(candidate)
-            trigram_count = count_trigram_match(candidate)
-            if trigram_count > largest_trigram_count:
-                largest_trigram_candidate = candidate
-                largest_trigram_count = trigram_count
-                print(end="\r")
-                print(candidate, end="")
+        for direction in range(2):
+            for offset in range(1,62):
+                candidate = ''.join([domain[((domain.index(letter) + pow(-1, direction)*offset)) % 62] for letter in input])
+                decryption_candidates.append(candidate)
+                trigram_count = count_trigram_match(candidate)
+                if trigram_count > largest_trigram_count:
+                    print(candidate)
+                    largest_trigram_candidate = candidate
+                    largest_trigram_count = trigram_count
 
     print("")
     print("I believe it is the following message:")
     print(largest_trigram_candidate)
     write_log(output)
-    print(Fore.GREEN + "Wrote decryption results to " + output + Style.RESET_ALL)
+    print(Fore.GREEN + "Wrote all decryption results to " + output + Style.RESET_ALL)
 
 def write_encrypted(input):
     global output
@@ -83,8 +85,12 @@ def ngramize(text, n):
 
 def main():
     global output
+    global english_ngrams
     init()
-    populate_english_ngrams("dictionaries/wordsEn.txt")
+    if os.path.isfile('ngrams.p'):
+        english_ngrams = pickle.load(open('ngrams.p', 'rb'))
+    else:
+        populate_english_ngrams("dictionaries/wordsEn.txt")
     args = []
     mode = ""
     output = "decrypt.out"
@@ -100,7 +106,7 @@ def main():
     print(Fore.GREEN + mode + args.file + Style.RESET_ALL)
     file = open(args.file, "r")
     if mode == "Decrypting ":
-        decrypt(file.read())
+        decrypt(file.read().strip())
         write_log(output)
     else:
         output = args.file + ".caesar"
